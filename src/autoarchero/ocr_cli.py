@@ -13,10 +13,10 @@ import numpy as np
 
 from autoarchero.ocr_engine import (
     OcrEngine,
-    drop_full_hits_inside_rois,
-    keep_richest_hit_per_roi,
     load_rois,
+    match_hits_to_rois,
     merge_nearby_hits,
+    outside_full_hits_as_question,
 )
 from autoarchero.template_match import match_templates
 
@@ -66,7 +66,11 @@ def main() -> int:
     parser.add_argument("--image", required=True, help="PNG path")
     parser.add_argument("--rois", required=True, help="ROI json directory")
     parser.add_argument("--templates", default="", help="Template PNG/JSON directory")
-    parser.add_argument("--full", action="store_true", help="OCR full frame in addition to ROIs")
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Also emit full-frame hits outside ROIs as '?'",
+    )
     args = parser.parse_args()
 
     image_path = Path(args.image)
@@ -101,16 +105,16 @@ def main() -> int:
         rois = load_rois(rois_dir)
         hits = []
         try:
+            need_full = bool(rois) or args.full
+            raw_full = engine.run_full(frame) if need_full else []
             if rois:
-                hits.extend(engine.run_rois(frame, rois))
-                hits = merge_nearby_hits(hits)
-                hits = keep_richest_hit_per_roi(hits)
+                # Hits atomiques (non fusionnes) pour ne pas coller du texte hors zone
+                hits.extend(match_hits_to_rois(raw_full, rois))
             if args.full:
-                hits.extend(engine.run_full(frame))
-                hits = drop_full_hits_inside_rois(hits, rois)
-                hits = merge_nearby_hits(hits)
-            if not rois and not args.full:
-                hits = []
+                merged = merge_nearby_hits(raw_full)
+                hits.extend(
+                    outside_full_hits_as_question(merged, rois) if rois else merged
+                )
         except Exception as exc:  # noqa: BLE001
             warning_parts.append(f"ocr_failed: {exc}")
             _log_error(project_hint, traceback.format_exc())

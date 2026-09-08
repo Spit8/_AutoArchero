@@ -76,7 +76,14 @@ def preprocess_roi(bgr: np.ndarray) -> np.ndarray:
         return bgr
     scale = 3
     up = cv2.resize(bgr, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-    gray = cv2.cvtColor(up, cv2.COLOR_BGR2GRAY)
+    return _adaptive_prep(up)
+
+
+def _adaptive_prep(bgr: np.ndarray) -> np.ndarray:
+    """Same binary prep as full-frame OCR (no upscale)."""
+    if bgr.size == 0:
+        return bgr
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
     thr = cv2.adaptiveThreshold(
         blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 8
@@ -261,8 +268,100 @@ def keep_richest_hit_per_roi(hits: List[OcrHit]) -> List[OcrHit]:
     return out
 
 
+# IoU min + fraction de la BB OCR qui doit etre dans la ROI (anti hors-scope).
+_MIN_MATCH_IOU = 0.15
+_MIN_HIT_COVERAGE = 0.45
+
+
+def _intersection_box(
+    a: tuple[int, int, int, int], b: tuple[int, int, int, int]
+) -> Optional[tuple[int, int, int, int]]:
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    x0 = max(ax, bx)
+    y0 = max(ay, by)
+    x1 = min(ax + aw, bx + bw)
+    y1 = min(ay + ah, by + bh)
+    if x1 <= x0 or y1 <= y0:
+        return None
+    return (x0, y0, x1 - x0, y1 - y0)
+
+
+def _hit_coverage_in_roi(h: OcrHit, r: Roi) -> float:
+    """Fraction de l'aire de la BB OCR a l'interieur de la ROI (0..1)."""
+    inter = _intersection_box(h.box, (r.x, r.y, r.w, r.h))
+    if inter is None:
+        return 0.0
+    hit_area = float(max(1, h.box[2] * h.box[3]))
+    return float(inter[2] * inter[3]) / hit_area
+
+
+def _hit_center(h: OcrHit) -> tuple[int, int]:
+    return h.box[0] + h.box[2] // 2, h.box[1] + h.box[3] // 2
+
+
+def _point_in_roi(cx: int, cy: int, r: Roi) -> bool:
+    return r.x <= cx < r.x + r.w and r.y <= cy < r.y + r.h
+
+
+def _hit_eligible_for_roi(h: OcrHit, r: Roi) -> bool:
+    """Hit full utilisable pour la zone (pas de re-OCR crop)."""
+    roi_box = (r.x, r.y, r.w, r.h)
+    if _box_iou(h.box, roi_box) < _MIN_MATCH_IOU:
+        return False
+    # Centre dans le guide, ou majorite de la BB dedans (ROI un peu plus basse que la BB).
+    cx, cy = _hit_center(h)
+    if _point_in_roi(cx, cy, r):
+        return True
+    return _hit_coverage_in_roi(h, r) >= _MIN_HIT_COVERAGE
+
+
+def match_hits_to_rois(full_hits: List[OcrHit], rois: List[Roi]) -> List[OcrHit]:
+    """Value = texte des hits plein ecran dans la zone (qualite full, pas de crop).
+
+    Attend des hits non fusionnes. Par ROI : hits eligibles → merge_nearby local →
+    cluster au meilleur IoU. Box clippee au guide.
+    """
+    enabled = [r for r in rois if r.enabled]
+    if not enabled or not full_hits:
+        return []
+    out: List[OcrHit] = []
+    for r in enabled:
+        roi_box = (r.x, r.y, r.w, r.h)
+        members = [
+            OcrHit(text=h.text, conf=h.conf, box=h.box, roi_name=r.name)
+            for h in full_hits
+            if _hit_eligible_for_roi(h, r)
+        ]
+        if not members:
+            continue
+        clusters = merge_nearby_hits(members)
+        winner = max(
+            clusters,
+            key=lambda h: (_box_iou(h.box, roi_box), _char_count(h.text), h.conf),
+        )
+        clipped = _intersection_box(winner.box, roi_box) or winner.box
+        out.append(
+            OcrHit(text=winner.text, conf=winner.conf, box=clipped, roi_name=r.name)
+        )
+    return out
+
+
+def outside_full_hits_as_question(full_hits: List[OcrHit], rois: List[Roi]) -> List[OcrHit]:
+    """Hits full hors des guides ROI (IoU < seuil) -> roi_name '?'."""
+    enabled = [r for r in rois if r.enabled]
+    out: List[OcrHit] = []
+    for h in full_hits:
+        if enabled and any(
+            _box_iou(h.box, (r.x, r.y, r.w, r.h)) >= _MIN_MATCH_IOU for r in enabled
+        ):
+            continue
+        out.append(OcrHit(text=h.text, conf=h.conf, box=h.box, roi_name="?"))
+    return out
+
+
 def drop_full_hits_inside_rois(hits: List[OcrHit], rois: List[Roi]) -> List[OcrHit]:
-    """Garde les hits crop nommés ; jette les hits full/? dont le centre est dans une ROI."""
+    """Garde les hits crop nommes ; jette les hits full/? dont le centre est dans une ROI."""
     enabled = [r for r in rois if r.enabled]
     if not enabled:
         return hits
@@ -361,6 +460,44 @@ class OcrEngine:
                 continue
         return hits
 
+    def read_rois_scoped(self, frame: Frame, rois: List[Roi]) -> List[OcrHit]:
+        """OCR chaque guide ROI : Value = texte lu dans le crop uniquement.
+
+        Meme prep que le plein ecran (pas d'upscale x3). Box emise = rectangle du guide.
+        """
+        self._ensure()
+        if self._ocr is None:
+            return []
+        out: List[OcrHit] = []
+        for roi in rois:
+            if not roi.enabled:
+                continue
+            try:
+                r = roi.clamp(frame.width, frame.height)
+                crop = crop_bgr(frame, r.x, r.y, r.w, r.h)
+                if crop.size == 0:
+                    continue
+                prep = _adaptive_prep(crop)
+                result, _elapsed = self._ocr(prep)
+                local = self._parse_result(result, 1.0, r.x, r.y, r.name)
+                if not local:
+                    continue
+                text = _join_cluster_text(local)
+                if not text:
+                    continue
+                conf = max(h.conf for h in local)
+                out.append(
+                    OcrHit(
+                        text=text,
+                        conf=conf,
+                        box=(r.x, r.y, r.w, r.h),
+                        roi_name=r.name,
+                    )
+                )
+            except Exception:  # noqa: BLE001
+                continue
+        return out
+
     def run_full(self, frame: Frame, max_long_side: int = 1280) -> List[OcrHit]:
         """Full-frame OCR with optional downscale for speed; boxes remapped to native."""
         self._ensure()
@@ -375,13 +512,7 @@ class OcrEngine:
             nw = max(1, int(round(w / scale)))
             nh = max(1, int(round(h / scale)))
             work = cv2.resize(bgr, (nw, nh), interpolation=cv2.INTER_AREA)
-        # OCR boxes are in `work` space → multiply by native/work to recover frame coords
         to_native = float(w) / float(work.shape[1])
-        gray = cv2.cvtColor(work, cv2.COLOR_BGR2GRAY)
-        blur = cv2.GaussianBlur(gray, (3, 3), 0)
-        thr = cv2.adaptiveThreshold(
-            blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 8
-        )
-        prep = cv2.cvtColor(thr, cv2.COLOR_GRAY2BGR)
+        prep = _adaptive_prep(work)
         result, _elapsed = self._ocr(prep)
         return self._parse_result(result, to_native, 0, 0, "full")

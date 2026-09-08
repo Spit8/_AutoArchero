@@ -6,7 +6,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 
 from .adb_client import AdbClient
 from .capture import Frame, png_bytes_to_frame
-from .ocr_engine import OcrEngine, OcrHit, Roi, keep_richest_hit_per_roi, merge_nearby_hits
+from .ocr_engine import OcrEngine, OcrHit, Roi, match_hits_to_rois
 
 
 class PipelineResult:
@@ -46,9 +46,10 @@ class CaptureOcrPipeline(QObject):
             png = self.adb.screencap_png()
             frame = png_bytes_to_frame(png)
             rois = self.rois_provider()
-            hits = self.ocr.run_rois(frame, rois)
-            hits = merge_nearby_hits(hits)
-            hits = keep_richest_hit_per_roi(hits)
+            hits: List[OcrHit] = []
+            if rois:
+                raw_full = self.ocr.run_full(frame)
+                hits = match_hits_to_rois(raw_full, rois)
             self.finished.emit(PipelineResult(frame, hits))
         except Exception as exc:  # noqa: BLE001
             self.failed.emit(str(exc))
