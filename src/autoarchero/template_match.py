@@ -3,16 +3,49 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Sequence, Tuple
 
 import cv2
 import numpy as np
+
+
+def _box_iou(a: Sequence[int], b: Sequence[int]) -> float:
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    x0 = max(ax, bx)
+    y0 = max(ay, by)
+    x1 = min(ax + aw, bx + bw)
+    y1 = min(ay + ah, by + bh)
+    inter = max(0, x1 - x0) * max(0, y1 - y0)
+    if inter <= 0:
+        return 0.0
+    union = aw * ah + bw * bh - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _suppress_overlapping_by_conf(
+    hits: List[Dict[str, Any]],
+    overlap_iou: float,
+) -> List[Dict[str, Any]]:
+    """Greedy NMS: keep highest-conf hit when boxes overlap (IoU >= threshold)."""
+    ordered = sorted(hits, key=lambda h: float(h.get("conf", 0.0)), reverse=True)
+    kept: List[Dict[str, Any]] = []
+    for hit in ordered:
+        box = hit.get("box")
+        if not isinstance(box, (list, tuple)) or len(box) != 4:
+            kept.append(hit)
+            continue
+        if any(_box_iou(box, k["box"]) >= overlap_iou for k in kept if "box" in k):
+            continue
+        kept.append(hit)
+    return kept
 
 
 def match_templates(
     frame_bgr: np.ndarray,
     templates_dir: Path,
     threshold: float = 0.82,
+    overlap_iou: float = 0.30,
 ) -> List[Dict[str, Any]]:
     if frame_bgr is None or frame_bgr.size == 0:
         return []
@@ -48,4 +81,4 @@ def match_templates(
         except Exception:  # noqa: BLE001
             # Skip corrupt / incompatible template; do not abort whole batch
             continue
-    return hits
+    return _suppress_overlapping_by_conf(hits, overlap_iou=overlap_iou)

@@ -1,0 +1,7 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/icons">
+        <file alias="tap.svg">../assets/icons/tap.svg</file>
+        <file alias="wait.svg">../assets/icons/wait.svg</file>
+    </qresource>
+</RCC>

@@ -1,7 +1,7 @@
 #include "TemplateStore.h"
 
-#include <QDateTime>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -105,4 +105,19 @@ QVector<TemplateEntry> TemplateStore::listEntries() const
         out.push_back(e);
     }
     return out;
+}
+
+void TemplateStore::remove(const QString &name) const
+{
+    const QString safe = sanitizeName(name);
+    const QString pngPath = QDir(m_dir).filePath(safe + QStringLiteral(".png"));
+    const QString jsonPath = QDir(m_dir).filePath(safe + QStringLiteral(".json"));
+    const bool hadPng = QFileInfo::exists(pngPath);
+    const bool hadJson = QFileInfo::exists(jsonPath);
+    if (!hadPng && !hadJson)
+        throw std::runtime_error("template not found: " + safe.toStdString());
+    if (hadPng && !QFile::remove(pngPath))
+        throw std::runtime_error("cannot delete template png: " + safe.toStdString());
+    if (hadJson && !QFile::remove(jsonPath))
+        throw std::runtime_error("cannot delete template json: " + safe.toStdString());
 }

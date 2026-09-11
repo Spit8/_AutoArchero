@@ -6,6 +6,10 @@
 #include "ImageViewer.h"
 #include "RoiStore.h"
 #include "TemplateStore.h"
+#include "TapNode.h"
+#include "WaitNode.h"
+#include "WorkflowEditor.h"
+#include "WorkflowRunner.h"
 
 #include <QApplication>
 #include <QCheckBox>
@@ -15,6 +19,9 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QGroupBox>
 #include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
@@ -26,6 +33,9 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSettings>
+#include <QSpinBox>
+#include <QSplitter>
+#include <QStackedWidget>
 #include <QThread>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -45,7 +55,16 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     loadConfig();
 
-    m_viewer = new ImageViewer(ui->viewerHost);
+    m_viewerSplit = new QSplitter(Qt::Horizontal, ui->viewerHost);
+    m_viewer = new ImageViewer(m_viewerSplit);
+    m_workflowEditor = new WorkflowEditor(m_viewerSplit);
+    m_viewerSplit->addWidget(m_viewer);
+    m_viewerSplit->addWidget(m_workflowEditor);
+    m_workflowEditor->hide();
+    m_viewerSplit->setStretchFactor(0, 1);
+    m_viewerSplit->setStretchFactor(1, 1);
+    m_viewerSplit->setSizes({700, 500});
+
     auto *layout = qobject_cast<QVBoxLayout *>(ui->viewerHost->layout());
     if (!layout) {
         layout = new QVBoxLayout(ui->viewerHost);
@@ -53,13 +72,66 @@ MainWindow::MainWindow(QWidget *parent)
     }
     while (layout->count() > 0) {
         QLayoutItem *it = layout->takeAt(0);
+        // Keep labelCursorCoords from the .ui — re-parent later
+        if (it->widget() && it->widget()->objectName() == QLatin1String("labelCursorCoords")) {
+            delete it;
+            continue;
+        }
         if (it->widget())
             it->widget()->deleteLater();
         delete it;
     }
-    layout->addWidget(m_viewer);
+    layout->addWidget(m_viewerSplit, 1);
+    if (ui->labelCursorCoords) {
+        layout->addWidget(ui->labelCursorCoords, 0);
+        ui->labelCursorCoords->setText(QStringLiteral("x: —  y: —"));
+    }
+
+    connect(m_viewer, &ImageViewer::cursorPosChanged, this,
+            [this](int x, int y, bool inside) {
+                if (!ui->labelCursorCoords)
+                    return;
+                if (!inside)
+                    ui->labelCursorCoords->setText(QStringLiteral("x: —  y: —"));
+                else
+                    ui->labelCursorCoords->setText(QStringLiteral("x: %1  y: %2").arg(x).arg(y));
+            });
+
+    connect(ui->sideTabs, &QTabWidget::currentChanged, this, &MainWindow::onSideTabChanged);
+    connect(ui->btnWorkflowRun, &QPushButton::clicked, this, &MainWindow::onWorkflowRun);
+    connect(ui->btnWorkflowLoop, &QPushButton::clicked, this, &MainWindow::onWorkflowLoop);
+    connect(ui->btnWorkflowStop, &QPushButton::clicked, this, &MainWindow::onWorkflowStop);
+    connect(ui->btnWorkflowExport, &QPushButton::clicked, this, &MainWindow::onWorkflowExport);
+    connect(ui->btnWorkflowImport, &QPushButton::clicked, this, &MainWindow::onWorkflowImport);
+    connect(m_workflowEditor, &WorkflowEditor::selectionChanged, this,
+            &MainWindow::onWorkflowSelectionChanged);
+    connect(m_workflowEditor, &WorkflowEditor::selectionCleared, this,
+            &MainWindow::onWorkflowSelectionCleared);
+    connect(ui->editNodeName, &QLineEdit::editingFinished, this, &MainWindow::onNodePropsEdited);
+    connect(ui->spinTapX, qOverload<int>(&QSpinBox::valueChanged), this, &MainWindow::onNodePropsEdited);
+    connect(ui->spinTapY, qOverload<int>(&QSpinBox::valueChanged), this, &MainWindow::onNodePropsEdited);
+    connect(ui->spinTapDuration, qOverload<int>(&QSpinBox::valueChanged), this,
+            &MainWindow::onNodePropsEdited);
+    connect(ui->spinWaitMs, qOverload<int>(&QSpinBox::valueChanged), this, &MainWindow::onNodePropsEdited);
+    connect(ui->spinWaitRandom, qOverload<int>(&QSpinBox::valueChanged), this,
+            &MainWindow::onNodePropsEdited);
+    onWorkflowSelectionCleared();
 
     m_adbUi = std::make_unique<AdbClient>(m_adbPath);
+    m_workflowRunner = new WorkflowRunner(m_workflowEditor, m_adbUi.get(), this);
+    m_workflowRunner->setCaptureHandler([this](WorkflowRunner::CaptureDone done) {
+        m_pendingWorkflowCapture = std::move(done);
+        emit captureRequested(fullOcrEnabled());
+    });
+    connect(m_workflowRunner, &WorkflowRunner::statusChanged, this,
+            [this](const QString &text) {
+                if (ui->labelWorkflowStatus)
+                    ui->labelWorkflowStatus->setText(text);
+            });
+    connect(m_workflowRunner, &WorkflowRunner::runningChanged, this,
+            &MainWindow::onWorkflowRunningChanged);
+    onWorkflowRunningChanged(false);
+
     m_rois = std::make_unique<RoiStore>(QDir(m_projectRoot).filePath(QStringLiteral("assets/rois")));
     m_templates = std::make_unique<TemplateStore>(QDir(m_projectRoot).filePath(QStringLiteral("assets/templates")));
     m_roiList = m_rois->load();
@@ -94,6 +166,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->btnSaveRoi, &QPushButton::clicked, this, &MainWindow::onSaveRoi);
     connect(ui->btnDeleteRoi, &QPushButton::clicked, this, &MainWindow::onDeleteRoi);
     connect(ui->btnSaveTemplate, &QPushButton::clicked, this, &MainWindow::onSaveTemplate);
+    connect(ui->btnDeleteTemplate, &QPushButton::clicked, this, &MainWindow::onDeleteTemplate);
     connect(ui->btnReloadAssets, &QPushButton::clicked, this, &MainWindow::onReloadAssets);
     connect(ui->btnTapCenter, &QPushButton::clicked, this, &MainWindow::onTapCenter);
     connect(ui->btnZoomIn, &QPushButton::clicked, m_viewer, &ImageViewer::zoomIn);
@@ -102,6 +175,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->listRois, &QListWidget::itemSelectionChanged, this, &MainWindow::onRoiListSelectionChanged);
     ui->listRois->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->listRois, &QListWidget::customContextMenuRequested, this, &MainWindow::onRoiListContextMenu);
+    ui->listTemplates->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->listTemplates, &QListWidget::customContextMenuRequested, this,
+            &MainWindow::onTemplateListContextMenu);
     connect(ui->btnCopyDebug, &QPushButton::clicked, this, [this]() {
         QApplication::clipboard()->setText(ui->editDebug->toPlainText());
         ui->labelStatus->setText(QStringLiteral("Status: Debug copié dans le presse-papiers"));
@@ -242,6 +318,224 @@ void MainWindow::onOcrNow()
     requestFrameOcr(QStringLiteral("manual"));
 }
 
+void MainWindow::onSideTabChanged(int index)
+{
+    if (!m_viewerSplit || !ui->sideTabs)
+        return;
+    QWidget *page = ui->sideTabs->widget(index);
+    const bool workflow = (page == ui->tabWorkflow);
+    if (m_workflowEditor)
+        m_workflowEditor->setVisible(workflow);
+    if (ui->labelCursorCoords)
+        ui->labelCursorCoords->setVisible(true);
+    if (!workflow && m_workflowRunner && m_workflowRunner->isRunning())
+        m_workflowRunner->stop();
+}
+
+void MainWindow::onWorkflowRun()
+{
+    if (ui->sideTabs && ui->tabWorkflow)
+        ui->sideTabs->setCurrentWidget(ui->tabWorkflow);
+    if (m_workflowEditor)
+        m_workflowEditor->setVisible(true);
+    if (m_workflowRunner && m_workflowRunner->isRunning())
+        return;
+    if (m_workflowRunner)
+        m_workflowRunner->startSingle();
+}
+
+void MainWindow::onWorkflowLoop()
+{
+    if (ui->sideTabs && ui->tabWorkflow)
+        ui->sideTabs->setCurrentWidget(ui->tabWorkflow);
+    if (m_workflowEditor)
+        m_workflowEditor->setVisible(true);
+    if (m_workflowRunner && m_workflowRunner->isRunning())
+        return;
+    if (m_workflowRunner)
+        m_workflowRunner->startLoop();
+}
+
+void MainWindow::onWorkflowRunningChanged(bool running)
+{
+    const QString activeStyle = QStringLiteral(
+        "QPushButton { background-color: #2ecc71; color: #111; font-weight: bold; }");
+
+    const bool isLoop = running && m_workflowRunner
+                        && m_workflowRunner->mode() == WorkflowRunner::Mode::Loop;
+    const bool isSingle = running && !isLoop;
+
+    if (ui->btnWorkflowRun) {
+        ui->btnWorkflowRun->setChecked(isSingle);
+        ui->btnWorkflowRun->setEnabled(!running);
+        ui->btnWorkflowRun->setStyleSheet(isSingle ? activeStyle : QString());
+    }
+    if (ui->btnWorkflowLoop) {
+        ui->btnWorkflowLoop->setChecked(isLoop);
+        ui->btnWorkflowLoop->setEnabled(!running);
+        ui->btnWorkflowLoop->setStyleSheet(isLoop ? activeStyle : QString());
+    }
+}
+
+void MainWindow::onWorkflowStop()
+{
+    if (m_workflowRunner)
+        m_workflowRunner->stop();
+}
+
+void MainWindow::onWorkflowExport()
+{
+    if (!m_workflowEditor)
+        return;
+    if (m_workflowRunner && m_workflowRunner->isRunning())
+        m_workflowRunner->stop();
+
+    QDir dir(QDir(m_projectRoot).filePath(QStringLiteral("assets/workflows")));
+    if (!dir.exists())
+        dir.mkpath(QStringLiteral("."));
+
+    QString path = QFileDialog::getSaveFileName(
+        this,
+        QStringLiteral("Exporter le workflow"),
+        dir.filePath(QStringLiteral("workflow.flow")),
+        QStringLiteral("Workflow (*.flow *.json)"));
+    if (path.isEmpty())
+        return;
+    if (!path.endsWith(QLatin1String(".flow"), Qt::CaseInsensitive)
+        && !path.endsWith(QLatin1String(".json"), Qt::CaseInsensitive)) {
+        path += QStringLiteral(".flow");
+    }
+
+    QString err;
+    if (!m_workflowEditor->exportToFile(path, &err)) {
+        QMessageBox::warning(this, QStringLiteral("Export workflow"), err);
+        return;
+    }
+    if (ui->labelWorkflowStatus)
+        ui->labelWorkflowStatus->setText(QStringLiteral("Exporté: %1").arg(QFileInfo(path).fileName()));
+    setStatus(QStringLiteral("Workflow exporté"));
+}
+
+void MainWindow::onWorkflowImport()
+{
+    if (!m_workflowEditor)
+        return;
+    if (m_workflowRunner && m_workflowRunner->isRunning())
+        m_workflowRunner->stop();
+
+    const QString dir = QDir(m_projectRoot).filePath(QStringLiteral("assets/workflows"));
+    const QString path = QFileDialog::getOpenFileName(
+        this,
+        QStringLiteral("Importer un workflow"),
+        dir,
+        QStringLiteral("Workflow (*.flow *.json)"));
+    if (path.isEmpty())
+        return;
+
+    QString err;
+    if (!m_workflowEditor->importFromFile(path, &err)) {
+        QMessageBox::warning(this, QStringLiteral("Import workflow"), err);
+        return;
+    }
+    if (m_workflowEditor)
+        m_workflowEditor->setVisible(true);
+    if (ui->sideTabs && ui->tabWorkflow)
+        ui->sideTabs->setCurrentWidget(ui->tabWorkflow);
+    if (ui->labelWorkflowStatus)
+        ui->labelWorkflowStatus->setText(QStringLiteral("Importé: %1").arg(QFileInfo(path).fileName()));
+    setStatus(QStringLiteral("Workflow importé"));
+}
+
+void MainWindow::setNodePropsVisible(bool hasSelection)
+{
+    if (ui->labelNoNodeSelected)
+        ui->labelNoNodeSelected->setVisible(!hasSelection);
+    if (ui->labelNodeName)
+        ui->labelNodeName->setVisible(hasSelection);
+    if (ui->editNodeName)
+        ui->editNodeName->setVisible(hasSelection);
+    if (ui->stackNodeTypeProps)
+        ui->stackNodeTypeProps->setVisible(hasSelection);
+}
+
+void MainWindow::onWorkflowSelectionCleared()
+{
+    if (m_nodeParamsConn)
+        disconnect(m_nodeParamsConn);
+    setNodePropsVisible(false);
+    if (ui->stackNodeTypeProps)
+        ui->stackNodeTypeProps->setCurrentWidget(ui->pagePropsEmpty);
+}
+
+void MainWindow::onWorkflowSelectionChanged(QtNodes::NodeId, QString typeName)
+{
+    Q_UNUSED(typeName);
+    bindSelectedNodeParams();
+    syncNodePropsFromSelection();
+}
+
+void MainWindow::bindSelectedNodeParams()
+{
+    if (m_nodeParamsConn)
+        disconnect(m_nodeParamsConn);
+    if (!m_workflowEditor)
+        return;
+
+    if (TapNode *tap = m_workflowEditor->selectedTap()) {
+        m_nodeParamsConn = connect(tap, &TapNode::paramsChanged, this,
+                                   &MainWindow::syncNodePropsFromSelection);
+    } else if (WaitNode *wait = m_workflowEditor->selectedWait()) {
+        m_nodeParamsConn = connect(wait, &WaitNode::paramsChanged, this,
+                                   &MainWindow::syncNodePropsFromSelection);
+    }
+}
+
+void MainWindow::syncNodePropsFromSelection()
+{
+    if (!m_workflowEditor || m_updatingNodeProps)
+        return;
+
+    m_updatingNodeProps = true;
+
+    if (TapNode *tap = m_workflowEditor->selectedTap()) {
+        setNodePropsVisible(true);
+        ui->editNodeName->setText(tap->displayName());
+        ui->spinTapX->setValue(tap->x());
+        ui->spinTapY->setValue(tap->y());
+        ui->spinTapDuration->setValue(tap->durationMs());
+        ui->stackNodeTypeProps->setCurrentWidget(ui->pagePropsTap);
+    } else if (WaitNode *wait = m_workflowEditor->selectedWait()) {
+        setNodePropsVisible(true);
+        ui->editNodeName->setText(wait->displayName());
+        ui->spinWaitMs->setValue(wait->durationMs());
+        ui->spinWaitRandom->setValue(wait->randomMs());
+        ui->stackNodeTypeProps->setCurrentWidget(ui->pagePropsWait);
+    } else {
+        onWorkflowSelectionCleared();
+    }
+
+    m_updatingNodeProps = false;
+}
+
+void MainWindow::onNodePropsEdited()
+{
+    if (m_updatingNodeProps || !m_workflowEditor)
+        return;
+
+    m_updatingNodeProps = true;
+    if (m_workflowEditor->selectedTap()) {
+        m_workflowEditor->setSelectedDisplayName(ui->editNodeName->text());
+        m_workflowEditor->setSelectedTapX(ui->spinTapX->value());
+        m_workflowEditor->setSelectedTapY(ui->spinTapY->value());
+        m_workflowEditor->setSelectedTapDurationMs(ui->spinTapDuration->value());
+    } else if (m_workflowEditor->selectedWait()) {
+        m_workflowEditor->setSelectedDisplayName(ui->editNodeName->text());
+        m_workflowEditor->setSelectedWaitDurationMs(ui->spinWaitMs->value());
+        m_workflowEditor->setSelectedWaitRandomMs(ui->spinWaitRandom->value());
+    }
+    m_updatingNodeProps = false;
+}
+
 void MainWindow::requestFrameOcr(const QString &reason)
 {
     if (modeName() != QLatin1String("Gaming"))
@@ -267,8 +561,15 @@ void MainWindow::refreshRoiList()
     const int keepRow = currentRoiRow();
     ui->listRois->clear();
     for (const Roi &r : m_roiList) {
+        const int cx = r.x + r.w / 2;
+        const int cy = r.y + r.h / 2;
         ui->listRois->addItem(
-            QStringLiteral("%1 — %2,%3 %4×%5").arg(r.name).arg(r.x).arg(r.y).arg(r.w).arg(r.h));
+            QStringLiteral("%1 — %2,%3 (%4×%5)")
+                .arg(r.name)
+                .arg(cx)
+                .arg(cy)
+                .arg(r.w)
+                .arg(r.h));
     }
     if (keepRow >= 0 && keepRow < ui->listRois->count())
         ui->listRois->setCurrentRow(keepRow);
@@ -286,6 +587,7 @@ void MainWindow::refreshTemplateList()
         else
             line += QStringLiteral(" — OK");
         auto *item = new QListWidgetItem(line);
+        item->setData(Qt::UserRole, e.name);
         if (!e.hasPng)
             item->setForeground(QColor(200, 80, 80));
         ui->listTemplates->addItem(item);
@@ -334,12 +636,25 @@ void MainWindow::onPipelineFinished(const PipelineResult &result)
     if (!result.warning.isEmpty())
         status += QStringLiteral(" | warn: %1").arg(result.warning);
     setStatus(status);
+
+    if (m_pendingWorkflowCapture) {
+        auto cb = std::move(m_pendingWorkflowCapture);
+        m_pendingWorkflowCapture = {};
+        cb(true, result, {});
+        return;
+    }
     scheduleNextLiveCapture();
 }
 
 void MainWindow::onPipelineFailed(const QString &message)
 {
     setStatus(QStringLiteral("Erreur: %1").arg(message));
+    if (m_pendingWorkflowCapture) {
+        auto cb = std::move(m_pendingWorkflowCapture);
+        m_pendingWorkflowCapture = {};
+        cb(false, {}, message);
+        return;
+    }
     scheduleNextLiveCapture();
 }
 
@@ -439,6 +754,51 @@ void MainWindow::onRoiListContextMenu(const QPoint &pos)
     QAction *del = menu.addAction(QStringLiteral("Supprimer ROI"));
     if (menu.exec(ui->listRois->mapToGlobal(pos)) == del)
         onDeleteRoi();
+}
+
+void MainWindow::onDeleteTemplate()
+{
+    QListWidgetItem *item = ui->listTemplates->currentItem();
+    QString name;
+    if (item)
+        name = item->data(Qt::UserRole).toString();
+    if (name.isEmpty())
+        name = ui->editTemplateName->text().trimmed();
+    if (name.isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("Template"),
+                                 QStringLiteral("Sélectionne un template dans la liste."));
+        return;
+    }
+    const auto reply = QMessageBox::question(
+        this, QStringLiteral("Supprimer template"),
+        QStringLiteral("Supprimer le template « %1 » du catalogue ?").arg(name),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (reply != QMessageBox::Yes)
+        return;
+    try {
+        m_templates->remove(name);
+        m_lastTemplateHits.erase(
+            std::remove_if(m_lastTemplateHits.begin(), m_lastTemplateHits.end(),
+                           [&](const TemplateHit &h) { return h.name == name; }),
+            m_lastTemplateHits.end());
+        refreshTemplateList();
+        refreshOverlays();
+        setStatus(QStringLiteral("Template supprimé: %1").arg(name));
+    } catch (const std::exception &ex) {
+        QMessageBox::warning(this, QStringLiteral("Template"), QString::fromUtf8(ex.what()));
+    }
+}
+
+void MainWindow::onTemplateListContextMenu(const QPoint &pos)
+{
+    QListWidgetItem *item = ui->listTemplates->itemAt(pos);
+    if (!item)
+        return;
+    ui->listTemplates->setCurrentItem(item);
+    QMenu menu(this);
+    QAction *del = menu.addAction(QStringLiteral("Supprimer template"));
+    if (menu.exec(ui->listTemplates->mapToGlobal(pos)) == del)
+        onDeleteTemplate();
 }
 
 void MainWindow::onHitRenameRequested(QRect box, QString currentName, QString currentValue)

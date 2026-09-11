@@ -33,6 +33,7 @@ public:
 signals:
     void roiDrawn(int x, int y, int w, int h);
     void hitRenameRequested(QRect box, QString currentName, QString currentValue);
+    void cursorPosChanged(int x, int y, bool insideFrame);
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;

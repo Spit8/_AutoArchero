@@ -1,0 +1,86 @@
+{
+    "connections": [
+        {
+            "inNodeId": 4,
+            "inPortIndex": 0,
+            "outNodeId": 3,
+            "outPortIndex": 0
+        },
+        {
+            "inNodeId": 3,
+            "inPortIndex": 0,
+            "outNodeId": 2,
+            "outPortIndex": 0
+        },
+        {
+            "inNodeId": 2,
+            "inPortIndex": 0,
+            "outNodeId": 0,
+            "outPortIndex": 0
+        }
+    ],
+    "nodes": [
+        {
+            "id": 0,
+            "internal-data": {
+                "displayName": "Wait1s",
+                "durationMs": 1000,
+                "model-name": "Wait",
+                "randomMs": 0
+            },
+            "label": "",
+            "labelVisible": false,
+            "position": {
+                "x": -95,
+                "y": -95
+            }
+        },
+        {
+            "id": 2,
+            "internal-data": {
+                "displayName": "Tap",
+                "durationMs": 50,
+                "model-name": "Tap",
+                "x": 540,
+                "y": 1794
+            },
+            "label": "",
+            "labelVisible": false,
+            "position": {
+                "x": 211,
+                "y": -150
+            }
+        },
+        {
+            "id": 3,
+            "internal-data": {
+                "displayName": "Wait1s",
+                "durationMs": 1000,
+                "model-name": "Wait",
+                "randomMs": 0
+            },
+            "label": "",
+            "labelVisible": false,
+            "position": {
+                "x": 204.47999999999996,
+                "y": 77.75999999999999
+            }
+        },
+        {
+            "id": 4,
+            "internal-data": {
+                "displayName": "Tap",
+                "durationMs": 50,
+                "model-name": "Tap",
+                "x": 784,
+                "y": 1815
+            },
+            "label": "",
+            "labelVisible": false,
+            "position": {
+                "x": 661.758401920439,
+                "y": 104.48816872427983
+            }
+        }
+    ]
+}

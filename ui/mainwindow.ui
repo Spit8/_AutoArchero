@@ -24,130 +24,203 @@
        </sizepolicy>
       </property>
       <layout class="QVBoxLayout" name="viewerHostLayout">
-       <property name="leftMargin"><number>0</number></property>
-       <property name="topMargin"><number>0</number></property>
-       <property name="rightMargin"><number>0</number></property>
-       <property name="bottomMargin"><number>0</number></property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QLabel" name="labelCursorCoords">
+         <property name="styleSheet">
+          <string notr="true">padding: 4px 8px; background: #2a2a2a; color: #ddd; font-family: Consolas, monospace;</string>
+         </property>
+         <property name="text">
+          <string>x: —  y: —</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
     </item>
     <item>
      <widget class="QTabWidget" name="sideTabs">
-      <property name="minimumWidth"><number>320</number></property>
-      <property name="maximumWidth"><number>400</number></property>
-      <property name="currentIndex"><number>0</number></property>
+      <property name="currentIndex">
+       <number>2</number>
+      </property>
       <widget class="QWidget" name="tabCapture">
-       <attribute name="title"><string>Capture</string></attribute>
+       <attribute name="title">
+        <string>Capture</string>
+       </attribute>
        <layout class="QVBoxLayout" name="captureLayout">
         <item>
          <widget class="QLabel" name="labelMode">
-          <property name="text"><string>Mode</string></property>
+          <property name="text">
+           <string>Mode</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QComboBox" name="comboMode">
-          <item><property name="text"><string>Test</string></property></item>
-          <item><property name="text"><string>Gaming</string></property></item>
+          <item>
+           <property name="text">
+            <string>Test</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Gaming</string>
+           </property>
+          </item>
          </widget>
         </item>
         <item>
          <widget class="QCheckBox" name="chkFullOcr">
-          <property name="text"><string>OCR plein écran</string></property>
+          <property name="text">
+           <string>OCR plein écran</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QPushButton" name="btnTestStart">
-          <property name="text"><string>Start live (2s)</string></property>
+          <property name="text">
+           <string>Start live (2s)</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QPushButton" name="btnTestStop">
-          <property name="text"><string>Stop live</string></property>
+          <property name="text">
+           <string>Stop live</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="labelLiveState">
-          <property name="text"><string>PAUSE — live arrêté</string></property>
-          <property name="alignment"><set>Qt::AlignCenter</set></property>
           <property name="styleSheet">
            <string notr="true">font-weight: 700; padding: 8px; background: #5c4a4a; color: #ffe8e8; border-radius: 4px;</string>
+          </property>
+          <property name="text">
+           <string>PAUSE — live arrêté</string>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignCenter</set>
           </property>
          </widget>
         </item>
         <item>
          <widget class="QPushButton" name="btnOcrNow">
-          <property name="text"><string>OCR now (Gaming)</string></property>
+          <property name="text">
+           <string>OCR now (Gaming)</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="labelGamingLast">
-          <property name="text"><string>Dernière demande: —</string></property>
-          <property name="wordWrap"><bool>true</bool></property>
+          <property name="text">
+           <string>Dernière demande: —</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="labelStatus">
-          <property name="text"><string>Status: idle</string></property>
-          <property name="wordWrap"><bool>true</bool></property>
+          <property name="text">
+           <string>Status: idle</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="labelDebug">
-          <property name="text"><string>Debug (sélectionnable)</string></property>
+          <property name="text">
+           <string>Debug (sélectionnable)</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QPlainTextEdit" name="editDebug">
-          <property name="readOnly"><bool>true</bool></property>
-          <property name="maximumBlockCount"><number>80</number></property>
-          <property name="minimumHeight"><number>100</number></property>
-          <property name="maximumHeight"><number>140</number></property>
           <property name="font">
            <font>
             <family>Consolas</family>
             <pointsize>9</pointsize>
            </font>
           </property>
-          <property name="placeholderText"><string>Logs OCR / erreurs — sélectionner pour copier</string></property>
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+          <property name="maximumBlockCount">
+           <number>80</number>
+          </property>
+          <property name="placeholderText">
+           <string>Logs OCR / erreurs — sélectionner pour copier</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QPushButton" name="btnCopyDebug">
-          <property name="text"><string>Copier debug</string></property>
+          <property name="text">
+           <string>Copier debug</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="labelZoom">
-          <property name="text"><string>Zoom (molette / milieu = pan)</string></property>
+          <property name="text">
+           <string>Zoom (molette / milieu = pan)</string>
+          </property>
          </widget>
         </item>
         <item>
          <layout class="QHBoxLayout" name="zoomButtonLayout">
           <item>
            <widget class="QPushButton" name="btnZoomIn">
-            <property name="text"><string>+</string></property>
+            <property name="text">
+             <string>+</string>
+            </property>
            </widget>
           </item>
           <item>
            <widget class="QPushButton" name="btnZoomOut">
-            <property name="text"><string>−</string></property>
+            <property name="text">
+             <string>−</string>
+            </property>
            </widget>
           </item>
           <item>
            <widget class="QPushButton" name="btnZoomFit">
-            <property name="text"><string>Fit</string></property>
+            <property name="text">
+             <string>Fit</string>
+            </property>
            </widget>
           </item>
          </layout>
         </item>
         <item>
          <widget class="QPushButton" name="btnTapCenter">
-          <property name="text"><string>Tap fantôme (centre)</string></property>
+          <property name="text">
+           <string>Tap fantôme (centre)</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="labelHits">
-          <property name="text"><string>Hits (Name: Value)</string></property>
+          <property name="text">
+           <string>Hits (Name: Value)</string>
+          </property>
          </widget>
         </item>
         <item>
@@ -155,64 +228,97 @@
         </item>
         <item>
          <spacer name="captureSpacer">
-          <property name="orientation"><enum>Qt::Vertical</enum></property>
+          <property name="orientation">
+           <enum>Qt::Orientation::Vertical</enum>
+          </property>
           <property name="sizeHint" stdset="0">
-           <size><width>20</width><height>20</height></size>
+           <size>
+            <width>20</width>
+            <height>20</height>
+           </size>
           </property>
          </spacer>
         </item>
        </layout>
       </widget>
       <widget class="QWidget" name="tabZones">
-       <attribute name="title"><string>Zones</string></attribute>
+       <attribute name="title">
+        <string>Zones</string>
+       </attribute>
        <layout class="QVBoxLayout" name="zonesLayout">
         <item>
          <widget class="QLabel" name="labelZonesHelp">
-          <property name="text"><string>Clic droit sur une BB → Renommer (gaming). Dessiner une box puis sauver.</string></property>
-          <property name="wordWrap"><bool>true</bool></property>
+          <property name="text">
+           <string>Clic droit sur une BB → Renommer (gaming). Dessiner une box puis sauver.</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QCheckBox" name="chkShowRoiGuides">
-          <property name="text"><string>Afficher guides ROI (cyan)</string></property>
-          <property name="checked"><bool>false</bool></property>
+          <property name="text">
+           <string>Afficher guides ROI (cyan)</string>
+          </property>
+          <property name="checked">
+           <bool>false</bool>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QCheckBox" name="chkDrawRoi">
-          <property name="text"><string>Dessiner ROI</string></property>
+          <property name="text">
+           <string>Dessiner ROI</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="labelLastBox">
-          <property name="text"><string>Dernière box: —</string></property>
-          <property name="wordWrap"><bool>true</bool></property>
+          <property name="text">
+           <string>Dernière box: —</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLineEdit" name="editRoiName">
-          <property name="placeholderText"><string>nom zone (sauver box)</string></property>
-          <property name="text"><string>zone</string></property>
+          <property name="text">
+           <string>zone</string>
+          </property>
+          <property name="placeholderText">
+           <string>nom zone (sauver box)</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QPushButton" name="btnSaveRoi">
-          <property name="text"><string>Sauver box → ROI</string></property>
+          <property name="text">
+           <string>Sauver box → ROI</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QPushButton" name="btnDeleteRoi">
-          <property name="text"><string>Supprimer ROI</string></property>
+          <property name="text">
+           <string>Supprimer ROI</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QPushButton" name="btnReloadAssets">
-          <property name="text"><string>Recharger depuis disque</string></property>
+          <property name="text">
+           <string>Recharger depuis disque</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="labelRois">
-          <property name="text"><string>ROI zones (OCR lit le texte dans la box)</string></property>
+          <property name="text">
+           <string>ROI zones (OCR lit le texte dans la box)</string>
+          </property>
          </widget>
         </item>
         <item>
@@ -220,29 +326,258 @@
         </item>
        </layout>
       </widget>
+      <widget class="QWidget" name="tabWorkflow">
+       <attribute name="title">
+        <string>Workflow</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="workflowLayout">
+        <item>
+         <widget class="QLabel" name="labelWorkflowHelp">
+          <property name="text">
+           <string>Éditeur de graphe Gaming. Single = une passe ; Loop = recommence jusqu'à Stop. Tap/Wait via ADB.</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btnWorkflowRun">
+          <property name="text">
+           <string>Single</string>
+          </property>
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="toolTip">
+           <string>Exécuter le chemin une fois</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btnWorkflowLoop">
+          <property name="text">
+           <string>Loop</string>
+          </property>
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+          <property name="toolTip">
+           <string>Rejouer le chemin en boucle jusqu'à Stop</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btnWorkflowStop">
+          <property name="text">
+           <string>Stop</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btnWorkflowExport">
+          <property name="text">
+           <string>Exporter…</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btnWorkflowImport">
+          <property name="text">
+           <string>Importer…</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="labelWorkflowStatus">
+          <property name="text">
+           <string>Workflow: idle</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="groupNodeProps">
+          <property name="title">
+           <string>Propriétés</string>
+          </property>
+          <layout class="QVBoxLayout" name="nodePropsLayout">
+           <item>
+            <widget class="QLabel" name="labelNoNodeSelected">
+             <property name="text">
+              <string>Aucun nœud sélectionné</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QFormLayout" name="nodePropsForm">
+             <item row="0" column="0">
+              <widget class="QLabel" name="labelNodeName">
+               <property name="text">
+                <string>Nom</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QLineEdit" name="editNodeName"/>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QStackedWidget" name="stackNodeTypeProps">
+             <widget class="QWidget" name="pagePropsEmpty">
+              <layout class="QVBoxLayout" name="pagePropsEmptyLayout"/>
+             </widget>
+             <widget class="QWidget" name="pagePropsTap">
+              <layout class="QFormLayout" name="formTap">
+               <item row="0" column="0">
+                <widget class="QLabel" name="labelTapX">
+                 <property name="text">
+                  <string>X</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QSpinBox" name="spinTapX">
+                 <property name="maximum">
+                  <number>99999</number>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="labelTapY">
+                 <property name="text">
+                  <string>Y</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QSpinBox" name="spinTapY">
+                 <property name="maximum">
+                  <number>99999</number>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="0">
+                <widget class="QLabel" name="labelTapDuration">
+                 <property name="text">
+                  <string>Durée (ms)</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="1">
+                <widget class="QSpinBox" name="spinTapDuration">
+                 <property name="maximum">
+                  <number>60000</number>
+                 </property>
+                 <property name="value">
+                  <number>50</number>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+             <widget class="QWidget" name="pagePropsWait">
+              <layout class="QFormLayout" name="formWait">
+               <item row="0" column="0">
+                <widget class="QLabel" name="labelWaitMs">
+                 <property name="text">
+                  <string>Durée (ms)</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QSpinBox" name="spinWaitMs">
+                 <property name="maximum">
+                  <number>600000</number>
+                 </property>
+                 <property name="value">
+                  <number>1000</number>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="labelWaitRandom">
+                 <property name="text">
+                  <string>Random ± (ms)</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QSpinBox" name="spinWaitRandom">
+                 <property name="maximum">
+                  <number>60000</number>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="workflowSpacer">
+          <property name="orientation">
+           <enum>Qt::Orientation::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
       <widget class="QWidget" name="tabTemplates">
-       <attribute name="title"><string>Templates</string></attribute>
+       <attribute name="title">
+        <string>Templates</string>
+       </attribute>
        <layout class="QVBoxLayout" name="templatesLayout">
         <item>
          <widget class="QLabel" name="labelTplHelp">
-          <property name="text"><string>Dessine une box (onglet Zones), nomme, puis capture. Match orange en live.</string></property>
-          <property name="wordWrap"><bool>true</bool></property>
+          <property name="text">
+           <string>Dessine une box (onglet Zones), nomme, puis capture. Match orange en live.</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLineEdit" name="editTemplateName">
-          <property name="placeholderText"><string>nom template</string></property>
-          <property name="text"><string>button</string></property>
+          <property name="text">
+           <string>button</string>
+          </property>
+          <property name="placeholderText">
+           <string>nom template</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QPushButton" name="btnSaveTemplate">
-          <property name="text"><string>Capturer template</string></property>
+          <property name="text">
+           <string>Capturer template</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btnDeleteTemplate">
+          <property name="text">
+           <string>Supprimer template</string>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="labelTemplates">
-          <property name="text"><string>Templates</string></property>
+          <property name="text">
+           <string>Templates</string>
+          </property>
          </widget>
         </item>
         <item>

@@ -1,6 +1,9 @@
 #pragma once
 
 #include "Types.h"
+#include "WorkflowRunner.h"
+
+#include <QtNodes/Definitions>
 
 #include <QImage>
 #include <QMainWindow>
@@ -18,6 +21,10 @@ class CaptureWorker;
 class ImageViewer;
 class RoiStore;
 class TemplateStore;
+class WorkflowEditor;
+class WorkflowRunner;
+class QSplitter;
+class QStackedWidget;
 class QThread;
 class QTimer;
 
@@ -43,14 +50,29 @@ private slots:
     void onRoiListContextMenu(const QPoint &pos);
     void onHitRenameRequested(QRect box, QString currentName, QString currentValue);
     void onSaveTemplate();
+    void onDeleteTemplate();
+    void onTemplateListContextMenu(const QPoint &pos);
     void onReloadAssets();
     void onTapCenter();
     void onRoiListSelectionChanged();
     void onPipelineFinished(const PipelineResult &result);
     void onPipelineFailed(const QString &message);
     void onLiveIdleTimeout();
+    void onSideTabChanged(int index);
+    void onWorkflowRun();
+    void onWorkflowLoop();
+    void onWorkflowStop();
+    void onWorkflowExport();
+    void onWorkflowImport();
+    void onWorkflowRunningChanged(bool running);
+    void onWorkflowSelectionChanged(QtNodes::NodeId id, QString typeName);
+    void onWorkflowSelectionCleared();
+    void onNodePropsEdited();
 
 private:
+    void syncNodePropsFromSelection();
+    void setNodePropsVisible(bool hasSelection);
+    void bindSelectedNodeParams();
     void loadConfig();
     void updateModeUi();
     void updateLiveIndicator();
@@ -66,7 +88,10 @@ private:
     int currentRoiRow() const;
 
     Ui::MainWindow *ui = nullptr;
+    QSplitter *m_viewerSplit = nullptr;
     ImageViewer *m_viewer = nullptr;
+    WorkflowEditor *m_workflowEditor = nullptr;
+    WorkflowRunner *m_workflowRunner = nullptr;
 
     std::unique_ptr<AdbClient> m_adbUi;
     std::unique_ptr<RoiStore> m_rois;
@@ -88,4 +113,8 @@ private:
 
     bool m_liveActive = false;
     QTimer *m_liveIdleTimer = nullptr;
+    bool m_updatingNodeProps = false;
+    QMetaObject::Connection m_nodeParamsConn;
+
+    WorkflowRunner::CaptureDone m_pendingWorkflowCapture;
 };

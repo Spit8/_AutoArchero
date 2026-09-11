@@ -11,6 +11,8 @@
 #include <QResizeEvent>
 #include <QWheelEvent>
 
+#include <cmath>
+
 namespace {
 constexpr qreal kZoomStep = 1.15;
 constexpr qreal kMinScale = 0.1;
@@ -31,6 +33,8 @@ ImageViewer::ImageViewer(QWidget *parent)
     setResizeAnchor(QGraphicsView::AnchorUnderMouse);
     setFocusPolicy(Qt::StrongFocus);
     setContextMenuPolicy(Qt::DefaultContextMenu);
+    setMouseTracking(true);
+    viewport()->setMouseTracking(true);
 }
 
 QString ImageViewer::ocrDisplayName(const QString &roiName)
@@ -281,6 +285,18 @@ void ImageViewer::mouseMoveEvent(QMouseEvent *event)
         const QPointF now = mapToScene(event->pos());
         m_rubber->setRect(QRectF(m_origin, now).normalized());
         event->accept();
+        // still report coords while drawing
+    }
+
+    {
+        const QPointF scenePos = mapToScene(event->pos());
+        const int x = int(std::floor(scenePos.x()));
+        const int y = int(std::floor(scenePos.y()));
+        const bool inside = m_pix && x >= 0 && y >= 0 && x < m_imgW && y < m_imgH;
+        emit cursorPosChanged(x, y, inside);
+    }
+
+    if (m_drawing && m_rubber) {
         return;
     }
     QGraphicsView::mouseMoveEvent(event);

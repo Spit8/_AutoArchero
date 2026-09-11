@@ -15,6 +15,7 @@ public:
     std::pair<QString, QString> saveCrop(const QImage &frame, const QString &name, const QRect &box) const;
     int countEntries() const;
     QVector<TemplateEntry> listEntries() const;
+    void remove(const QString &name) const;
     QString dir() const { return m_dir; }
 
 private:
